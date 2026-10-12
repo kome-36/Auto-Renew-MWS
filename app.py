@@ -45,25 +45,24 @@ def build_proxies():
     return None
 
 def send_tg_notification(message: str):
-    """发送 Telegram 通知"""
+    """发送 Telegram 通知（标准库直连，不走代理、不伪装指纹）"""
+    import json, urllib.request, urllib.error
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         print("⚠️ 未配置 TG_BOT_TOKEN 或 TG_CHAT_ID，跳过 TG 通知。")
         return
 
-    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TG_CHAT_ID, "text": message, "parse_mode": "HTML"}
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN.strip()}/sendMessage"
+    data = json.dumps({"chat_id": TG_CHAT_ID.strip(), "text": message, "parse_mode": "HTML"}).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     try:
-        resp = requests.post(
-            url, json=payload, timeout=10, impersonate="chrome", proxies=build_proxies()
-        )
-        if resp.status_code == 200:
-            print("✅ TG 通知发送成功")
-        else:
-            print(f"❌ TG 通知发送失败: {resp.text}")
+        with opener.open(req, timeout=10) as resp:
+            print("✅ TG 通知发送成功" if resp.status == 200 else f"❌ TG 通知发送失败: {resp.read().decode()}")
+    except urllib.error.HTTPError as e:
+        print(f"❌ TG 通知发送失败: {e.code} {e.read().decode()}")
     except Exception as e:
         print(f"❌ TG 通知发送异常: {e}")
-
 def mask_secret(value: str) -> str:
     if not value:
         return "***"
